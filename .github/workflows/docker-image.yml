@@ -1,0 +1,35 @@
+name: Docker Image CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Login to ACR
+      uses: docker/login-action@v2
+      with:
+        registry: ${{ secrets.ACR_SERVER }}
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Docker Build
+      run: |
+        docker build -t ${{ secrets.ACR_SERVER }}/demo-app:1.0.0 .
+
+    - name: Install & Run trivy Scan
+      run: |
+        curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.37.1
+        trivy image --severity 'HIGH,CRITICAL' --timeout 15m --exit-code 1 ${{ secrets.ACR_SERVER }}/demo-app:1.0.0
+
+    - name: Docker Push
+      run: |
+        docker push ${{ secrets.ACR_SERVER }}/demo-app:1.0.0
